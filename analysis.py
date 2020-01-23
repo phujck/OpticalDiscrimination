@@ -185,9 +185,10 @@ scalefactor2 = 1
 ascale = 1
 ascale2 = 1
 Jscale = 1
+libN=3
 
-prop = hams.hhg(field=field, nup=number, ndown=number, nx=nx, ny=0, U=U, t=t, F0=F0, a=a, bc='pbc')
-prop2 = hams.hhg(field=field, nup=number, ndown=number, nx=nx, ny=0, U=U2, t=t2, F0=F0, a=a, bc='pbc')
+prop = hams.hhg(cycles=cycles,delta=delta,libN=libN,field=field, nup=number, ndown=number, nx=nx, ny=0, U=U, t=t, F0=F0, a=a, bc='pbc')
+prop2 = hams.hhg(cycles=cycles,delta=delta,libN=libN,field=field, nup=number, ndown=number, nx=nx, ny=0, U=U2, t=t2, F0=F0, a=a, bc='pbc')
 
 # load files
 parameternames = '-%s-nsites-%s-cycles-%s-U-%s-t-%s-n-%s-delta-%s-field-%s-amplitude.npy' % (

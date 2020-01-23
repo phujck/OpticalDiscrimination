@@ -1,7 +1,7 @@
 import os
 from multiprocessing import Process, Pool
 import numpy as np
-# from tqdm import tqdm
+from tqdm import tqdm
 import definition as harmonic
 import poolscripts
 import observable as observable
@@ -9,6 +9,7 @@ import hub_lats as hub
 import harmonic as har_spec
 from scipy.integrate import ode
 from scipy.interpolate import interp1d
+import matplotlib.pyplot as plt
 
 
 # This contains the stuff needed to calculate some expectations. Generally contains stuff
@@ -32,7 +33,6 @@ neighbour_check = []
 energy = []
 doublon_energy = []
 phi_original = []
-J_field = []
 phi_reconstruct = [0., 0.]
 boundary_1 = []
 boundary_2 = []
@@ -51,8 +51,8 @@ t = 0.52
 # t=1.91
 # t=1
 U = 1*t
-delta = 0.01
-cycles = 5
+delta = 0.1
+cycles = 3
 field= 32.9
 # field=32.9*0.5
 F0=10
@@ -82,68 +82,85 @@ pool = Pool(processes=4)
 # print(x[1])
 
 
-libN=3
-U_start=0
+libN=2
+U_start=0.5
 U_end=2*t
-
+sections=(cycles-1)/libN
 U_list=np.linspace(U_start,U_end,libN)
 time = cycles
 
 
 
 def setup(U_input):
-    system=harmonic.hhg(field=field, nup=number, ndown=number, nx=nx, ny=0, U=U_input, t=t, F0=F0, a=a, bc='pbc')
+    system=harmonic.hhg(cycles=cycles,delta=delta,libN=libN,field=field, nup=number, ndown=number, nx=nx, ny=0, U=U_input, t=t, F0=F0, a=a, bc='pbc')
     return system
 systems=[]
 for U in U_list:
     systems.append(setup(U))
 
-print(systems[0].U)
-x=pool.map(poolscripts.get_U,systems)
-print(len(x))
-print(x[0])
-print(x[1])
-print(x[2])
+N = int(cycles/(systems[0].freq*delta))+1
 
-def pump():
-    return 1
+"""returns systems with both their last current and . First index is process number, second nu mber is either """
+systems=pool.map(poolscripts.pump,systems)
 
-
-
-
-# def phi_func(current_time):
-#     if current_time < time / (libN * systems[0].freq):
-#         phi = (systems[k].a * systems[k].F0 / systems[k].field) * np.sin(current_time) ** 2.
-#     else:
-#         phi = 0
-#     return phi
 #
-# # phi_original=[phi_func(j) for j in np.linspace(0,cycles/(libN * systems[0].freq), )]
-#
-# plt.plot(phi_original)
-# plt.show()
-# for k in range(1,libN):
-#     parameternames = '-%s-nsites-%s-cycles-%s-U-%s-t-%s-n-%s-delta-%s-field-%s-amplitude' % (
-#     nx, cycles, U, t, number, delta, field, F0)
-#     U=k*t
-#     systems.append(harmonic.hhg(field=field, nup=number, ndown=number, nx=nx, ny=0, U=U, t=t, F0=F0, a=a, bc='pbc'))
-#     N = int(time / (systems[0].freq * delta)) + 1
-#     print("$t_0$:")
-#     print(systems[0].t)
-#     print("a:")
-#     print(systems[0].a)
-#     print("field:")
-#     print(systems[0].field)
-#     print("$E_0:")
-#     print(systems[0].F0)
-#     print('\n')
-#     print(vars(systems[0]))
-#     psi_temp = harmonic.hubbard(systems[k])[1].astype(complex)
-#     init=psi_temp
-#     h= hub.create_1e_ham(systems[0],True)
-#     print(N)
-#
-#
+# print("normalisation")
+# print(np.dot(x[1][0],np.conj(x[1][0])))
+# print(np.dot(x[0][0],np.conj(x[0][0])))
+# print("currents")
+# print(x[0][1])
+# print(x[1][1])
+print(systems[0].last_J)
+print(systems[0].last_psi)
+
+"""Now we track one of the systems, evolve it, then evolve the rest with the phi we obtain."""
+
+def evolve_track(system,k):
+    phi_original=system.phi
+    inittime=1/system.freq +k*sections/system.freq
+    def J_func(current_time):
+        J=system.last_J*np.exp(-3*(current_time-inittime))
+        return J
+
+    h= hub.create_1e_ham(system,True)
+    r = ode(evolve.integrate_f_track_J).set_integrator('zvode', method='bdf')
+    r.set_initial_value(system.last_psi, inittime).set_f_params(system,h,J_func)
+    branch = 0
+    delta=system.delta
+    while r.successful() and r.t < 1/system.freq+(k+1)*sections/system.freq:
+        r.integrate(r.t + delta)
+        psi_temp = r.y
+        newtime = r.t
+        # add to expectations
+        neighbour.append(har_spec.nearest_neighbour_new(system, h, psi_temp))
+        # two_body.append(har_spec.two_body_old(system, psi_temp))
+        # tracking current
+        phi_original.append(evolve.phi_J_track(system, newtime, J_func, neighbour[-1], psi_temp))
+        harmonic.progress(N, int(newtime / delta))
+    return phi_original
+
+print(len(systems))
+k=0
+for k in tqdm(range(0,libN)):
+    print('k=%s' % k)
+    phi_original= evolve_track(systems[0],k)
+    for j in range(0,len(systems)):
+        if j>k:
+            systems[j].phi=phi_original
+            systems[j].iter+=1
+    if len(systems)>1:
+        systems=pool.map(poolscripts.evolve_others,systems[1:])
+    print('number of systems= %s' % len(systems))
+plt.plot(systems[0].phi)
+
+
+
+plt.show()
+
+
+
+
+
 #     prop=systems[k]
 #     r = ode(evolve.integrate_f_discrim).set_integrator('zvode', method='bdf')
 #     r.set_initial_value(psi_temp, 0).set_f_params(systems[0],h,phi_func)
