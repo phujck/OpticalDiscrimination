@@ -1,5 +1,27 @@
 import os
-from multiprocessing import Process
+from multiprocessing import Process, Pool
+import numpy as np
+# from tqdm import tqdm
+import definition as harmonic
+import poolscripts
+import observable as observable
+import hub_lats as hub
+import harmonic as har_spec
+from scipy.integrate import ode
+from scipy.interpolate import interp1d
+
+
+# This contains the stuff needed to calculate some expectations. Generally contains stuff
+# that applies operators to the wave function
+import evolve as evolve
+
+# Contains lots of important functions.
+import definition as definition
+# Sets up the lattice for the system
+import hub_lats as hub
+
+# These also contain various important observable calculators
+import harmonic as har_spec
 
 # input units: THz (field), eV (t, U), MV/cm (peak amplitude, F0), Angstroms (systems[0]tice cst, a)
 # they're then converted to t-normalised atomic units. bc='pbc' for periodic and 'abc' for antiperiodic
@@ -35,35 +57,59 @@ field= 32.9
 # field=32.9*0.5
 F0=10
 a=4
+#
+# def info(title):
+#     print(title)
+#     print('module name:', __name__)
+#     # only available on Unix
+#     if hasattr(os, 'getppid'):
+#         print('parent process:', os.getppid())
+#     print('process id:', os.getpid())
+#
 
-libN=5
-time = cycles
-
-
-def info(title):
-    print(title)
-    print('module name:', __name__)
-    # only available on Unix
-    if hasattr(os, 'getppid'):
-        print('parent process:', os.getppid())
-    print('process id:', os.getpid())
-
-
-def f(name, names):
+def f(name):
     # info('function f')
     # print('hello', name)
-    names.append(name)
     return name
 
 
-names2 = []
-if __name__ == '__main__':
-    info('main line')
-    for k in ['bob', 'alice']:
-        p = Process(target=f, args=(k, names2))
-        p.start()
-        p.join()
-print(names2)
+
+pool = Pool(processes=4)
+
+# x=pool.map(f,['bob','alice'])
+
+# print(x[0])
+# print(x[1])
+
+
+libN=3
+U_start=0
+U_end=2*t
+
+U_list=np.linspace(U_start,U_end,libN)
+time = cycles
+
+
+
+def setup(U_input):
+    system=harmonic.hhg(field=field, nup=number, ndown=number, nx=nx, ny=0, U=U_input, t=t, F0=F0, a=a, bc='pbc')
+    return system
+systems=[]
+for U in U_list:
+    systems.append(setup(U))
+
+print(systems[0].U)
+x=pool.map(poolscripts.get_U,systems)
+print(len(x))
+print(x[0])
+print(x[1])
+print(x[2])
+
+def pump():
+    return 1
+
+
+
 
 # def phi_func(current_time):
 #     if current_time < time / (libN * systems[0].freq):

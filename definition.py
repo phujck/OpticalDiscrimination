@@ -29,6 +29,11 @@ class hhg(hub.Lattice):
         self.F0=F0*1.944689151e-4*(factor**2)
         assert self.nup<=self.nsites,'Too many ups!'
         assert self.ndown<=self.nsites,'Too many downs!'
+
+def setup(U_input):
+    system=hhg(field=field, nup=number, ndown=number, nx=nx, ny=0, U=U_input, t=t, F0=F0, a=a, bc='pbc')
+    return system
+
     
 def compute_inner_product(civec, norbs, nelecs, ops, cres, alphas):
   neleca, nelecb = nelecs
