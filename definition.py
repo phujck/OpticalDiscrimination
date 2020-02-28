@@ -1,21 +1,25 @@
 import numpy as np
-import hub_lats as hub
-import des_cre as dc
 from pyscf import fci
 
+import des_cre as dc
+import hub_lats as hub
+
+
 class hhg(hub.Lattice):
-    def __init__(self,cycles,delta,libN,field,nup,ndown,nx,ny,U,t=0.52,F0=10.,a=4.,lat_type='square',bc=None,nnn=False,last_psi=0,last_J=0,phi=0,iter=0):
-        hub.Lattice.__init__(self,nx,ny,lat_type,nnn,bc)
-        self.cycles=cycles
-        self.delta=delta
-        self.libN=libN
-        self.nup=nup
-        self.ndown=ndown
-        self.ne=nup+ndown
-        self.last_psi=last_psi
-        self.last_J=last_J
-        self.phi=phi
-        self.iter=iter
+    def __init__(self, cycles, delta, libN, field, nup, ndown, nx, ny, U, t=0.52, F0=10., a=4., lat_type='square',
+                 bc=None, nnn=False, last_psi=0, last_J=0, phi=0, iter=0, neighbourexpec=0):
+        hub.Lattice.__init__(self, nx, ny, lat_type, nnn, bc)
+        self.cycles = cycles
+        self.delta = delta
+        self.libN = libN
+        self.nup = nup
+        self.ndown = ndown
+        self.ne = nup + ndown
+        self.last_psi = last_psi
+        self.last_J = last_J
+        self.phi = phi
+        self.iter = iter
+        self.neighbourexpec = neighbourexpec
         #input units: THz (field), eV (t, U), MV/cm (peak amplitude), Angstroms (lattice cst) 
         #converts to a'.u, which are atomic units but with energy normalised to t, so
         #Note, hbar=e=m_e=1/4pi*ep_0=1, and c=1/alpha=137

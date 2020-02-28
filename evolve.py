@@ -1,5 +1,6 @@
 import numpy as np
 from pyscf import fci
+
 import harmonic
 
 
@@ -134,8 +135,8 @@ def phi_D_track(lat, current_time, D_reconstruct,two_body_expect, psi):
 
 
 
-def ham_J_track(lat, h, current_time, J_reconstruct,neighbour, psi):
-    phi=phi_J_track(lat, current_time, J_reconstruct,neighbour, psi)
+def ham_J_track(lat, h, current_time, J_reconstruct, neighbour, psi):
+    phi = phi_J_track(lat, current_time, J_reconstruct, neighbour, psi)
     h_forwards = np.triu(h)
     h_forwards[0, -1] = 0.0
     h_forwards[-1, 0] = h[-1, 0]
@@ -145,12 +146,24 @@ def ham_J_track(lat, h, current_time, J_reconstruct,neighbour, psi):
     return np.exp(1.j * phi) * h_forwards + np.exp(-1.j * phi) * h_backwards
 
 
-def integrate_f_track_J(current_time,  psi, lat, h, J_reconstruct):
-    ht = ham_J_track_ZVODE(current_time,psi,J_reconstruct,lat,h)
+def ham_J_track_phi(lat, h, current_time, phi_func):
+    phi = phi_func(current_time)
+    h_forwards = np.triu(h)
+    h_forwards[0, -1] = 0.0
+    h_forwards[-1, 0] = h[-1, 0]
+    h_backwards = np.tril(h)
+    h_backwards[-1, 0] = 0.0
+    h_backwards[0, -1] = h[0, -1]
+    return np.exp(1.j * phi) * h_forwards + np.exp(-1.j * phi) * h_backwards
+
+
+def integrate_f_track_J(current_time, psi, lat, h, J_reconstruct):
+    ht = ham_J_track_ZVODE(current_time, psi, J_reconstruct, lat, h)
     return -1j * f(lat, ht, psi)
 
-def integrate_f_cutfreqs(current_time,  psi, lat, h, phi_cut):
-    ht = ham_J_cutfreqs_ZVODE(current_time,phi_cut,h)
+
+def integrate_f_cutfreqs(current_time, psi, lat, h, phi_cut):
+    ht = ham_J_cutfreqs_ZVODE(current_time, phi_cut, h)
     return -1j * f(lat, ht, psi)
 
 def integrate_f_discrim(current_time,  psi, lat, h, phi_cut):
@@ -225,22 +238,33 @@ def ham_D_track_ZVODE(current_time, psi, D_reconstruct,lat, h):
 
 
 def RK4_J_track(lat, h, delta, current_time, J_reconstruct, neighbour, psi):
-    ht = ham_J_track(lat, h, current_time, J_reconstruct,neighbour, psi)
+    ht = ham_J_track(lat, h, current_time, J_reconstruct, neighbour, psi)
     k1 = -1.j * delta * f(lat, ht, psi)
-    ht = ham_J_track(lat, h, current_time + 0.5 * delta,J_reconstruct,neighbour, psi)
+    ht = ham_J_track(lat, h, current_time + 0.5 * delta, J_reconstruct, neighbour, psi)
     k2 = -1.j * delta * f(lat, ht, psi + 0.5 * k1)
     k3 = -1.j * delta * f(lat, ht, psi + 0.5 * k2)
-    ht = ham_J_track(lat, h, current_time + delta, J_reconstruct,neighbour, psi)
+    ht = ham_J_track(lat, h, current_time + delta, J_reconstruct, neighbour, psi)
     k4 = -1.j * delta * f(lat, ht, psi + k3)
     return psi + (k1 + 2. * k2 + 2. * k3 + k4) / 6.
+
+
+def RK4_phi_track(lat, h, delta, current_time, phi, psi):
+    ht = ham_J_track_phi(lat, h, current_time, phi)
+    k1 = -1.j * delta * f(lat, ht, psi)
+    ht = ham_J_track_phi(lat, h, current_time + 0.5 * delta, phi)
+    k2 = -1.j * delta * f(lat, ht, psi + 0.5 * k1)
+    k3 = -1.j * delta * f(lat, ht, psi + 0.5 * k2)
+    ht = ham_J_track_phi(lat, h, current_time + delta, phi)
+    k4 = -1.j * delta * f(lat, ht, psi + k3)
+    return psi + (k1 + 2. * k2 + 2. * k3 + k4) / 6.
+
 
 def RK4_D_track(lat, h, delta, current_time, J_reconstruct, neighbour, psi):
-    ht = ham_D_track(lat, h, current_time, J_reconstruct,neighbour, psi)
+    ht = ham_D_track(lat, h, current_time, J_reconstruct, neighbour, psi)
     k1 = -1.j * delta * f(lat, ht, psi)
-    ht = ham_D_track(lat, h, current_time + 0.5 * delta,J_reconstruct,neighbour, psi)
+    ht = ham_D_track(lat, h, current_time + 0.5 * delta, J_reconstruct, neighbour, psi)
     k2 = -1.j * delta * f(lat, ht, psi + 0.5 * k1)
     k3 = -1.j * delta * f(lat, ht, psi + 0.5 * k2)
-    ht = ham_D_track(lat, h, current_time + delta, J_reconstruct,neighbour, psi)
+    ht = ham_D_track(lat, h, current_time + delta, J_reconstruct, neighbour, psi)
     k4 = -1.j * delta * f(lat, ht, psi + k3)
     return psi + (k1 + 2. * k2 + 2. * k3 + k4) / 6.
-

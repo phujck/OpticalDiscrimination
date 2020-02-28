@@ -1,13 +1,10 @@
-import numpy as np
+import os
+import sys
+
 import matplotlib.pyplot as plt
-import definition as hams
-import numpy.ma as ma
-from matplotlib import cm as cm
-from scipy.signal import blackman
-from scipy.signal import stft
-import harmonic as har_spec
-from scipy.signal import savgol_filter
-from scipy.interpolate import interp1d
+import numpy as np
+
+import definition as harmonic
 
 
 def iFT(A):
@@ -45,99 +42,6 @@ def FT(A):
     return result
 
 
-def smoothing(A, b=1, c=5, d=0):
-    if b == 1:
-        b = int(A.size / 50)
-    if b % 2 == 0:
-        b = b + 1
-    j = savgol_filter(A, b, c, deriv=d)
-    return j
-
-
-def current(sys, phi, neighbour):
-    conjugator = np.exp(-1j * phi) * neighbour
-    c = sys.a * sys.t * 2 * np.imag(conjugator)
-    return c
-
-
-Tracking = False
-Track_Branch = False
-
-
-def plot_spectra(U, w, spec, min_spec, max_harm):
-    # spec = np.log10(spec)
-    xlines = [2 * i - 1 for i in range(1, 6)]
-    for i, j in enumerate(U):
-        plt.semilogy(w, spec[:, i], label='$\\frac{U}{t_0}=$ %.1f' % (j))
-        axes = plt.gca()
-        axes.set_xlim([0, max_harm])
-        axes.set_ylim([10 ** (-15), spec.max()])
-    for xc in xlines:
-        plt.axvline(x=xc, color='black', linestyle='dashed')
-        plt.xlabel('Harmonic Order')
-        plt.ylabel('HHG spectra')
-    plt.legend(loc='upper right')
-    plt.show()
-
-
-def plot_spectra_switch(U, w, spec, min_spec, max_harm):
-    spec = np.log10(spec)
-    xlines = [2 * i - 1 for i in range(1, 6)]
-    for i, j in enumerate(U):
-        plt.plot(w, spec[:, i], label='%s' % (j))
-        axes = plt.gca()
-        axes.set_xlim([0, max_harm])
-        axes.set_ylim([-min_spec, spec.max()])
-    for xc in xlines:
-        plt.axvline(x=xc, color='black', linestyle='dashed')
-        plt.xlabel('Harmonic Order')
-        plt.ylabel('HHG spectra')
-    plt.legend(loc='upper right')
-    plt.show()
-
-
-def plot_spectra_track(U, w, spec, min_spec, max_harm):
-    # spec = np.log10(spec)
-    xlines = [2 * i - 1 for i in range(1, 6)]
-    for i, j in enumerate(U):
-        print(i)
-        print(i % 2)
-        if i < 2:
-            plt.semilogy(w, spec[:, i], label='%s' % (j))
-        else:
-            plt.semilogy(w, spec[:, i], linestyle='dashed', label='%s' % (j))
-        axes = plt.gca()
-        axes.set_xlim([0, max_harm])
-        axes.set_ylim([10 ** (-min_spec), spec.max()])
-    for xc in xlines:
-        plt.axvline(x=xc, color='black', linestyle='dashed')
-        plt.xlabel('Harmonic Order')
-        plt.ylabel('HHG spectra')
-    plt.legend(loc='upper right')
-    plt.show()
-
-
-def plot_spectrogram(t, w, spec, min_spec=11, max_harm=60):
-    w = w[w <= max_harm]
-    t, w = np.meshgrid(t, w)
-    spec = np.log10(spec[:len(w)])
-    specn = ma.masked_where(spec < -min_spec, spec)
-    cm.RdYlBu_r.set_bad(color='white', alpha=None)
-    plt.pcolormesh(t, w, specn, cmap='RdYlBu_r')
-    plt.colorbar()
-    plt.xlabel('Time [Cycles]')
-    plt.ylabel('Harmonic Order')
-    plt.title('Time-Resolved Emission')
-    plt.show()
-
-
-def FT_count(N):
-    if N % 2 == 0:
-        return int(1 + N / 2)
-    else:
-        return int((N + 1) / 2)
-
-
 # These are Parameters I'm using
 # number=2
 # nelec = (number, number)
@@ -160,129 +64,241 @@ params = {
 plt.rcParams.update(params)
 print(plt.rcParams.keys())
 # Load parameters and data. 2 suffix is for loading in a different simulation for comparison
+neighbour = []
+phi_original = []
+phi_reconstruct = [0., 0.]
+boundary_1 = []
+boundary_2 = []
+two_body = []
+two_body_old = []
+error = []
+J_field = []
+D_cutfreq = []
+Jalt = []
+systems = []
+
 number = 3
-number2 = number
 nelec = (number, number)
 nx = 6
-nx2 = nx
 ny = 0
 t = 0.52
-t1 = t
-t2 = 0.52
-U = 0.2 * t
-U2 = 1 * t
-delta = 0.01
-delta2 = 0.01
-cycles = 2
-cycles2 = 2
-# field= 32.9
+# t=1.91
+# t=1
+U = 1 * t
+cutoff = 40
+delta = 0.02
 field = 32.9
-field2 = 32.9
+# field=25
 F0 = 10
 a = 4
-scalefactor = 1
-scalefactor2 = 1
 ascale = 1
-ascale2 = 1
-Jscale = 1
-libN=3
-
-prop = hams.hhg(cycles=cycles,delta=delta,libN=libN,field=field, nup=number, ndown=number, nx=nx, ny=0, U=U, t=t, F0=F0, a=a, bc='pbc')
-prop2 = hams.hhg(cycles=cycles,delta=delta,libN=libN,field=field, nup=number, ndown=number, nx=nx, ny=0, U=U2, t=t2, F0=F0, a=a, bc='pbc')
-
-# load files
-parameternames = '-%s-nsites-%s-cycles-%s-U-%s-t-%s-n-%s-delta-%s-field-%s-amplitude.npy' % (
-    nx, cycles, U, t, number, delta, field, F0)
-newparameternames = '-%s-nsites-%s-cycles-%s-U-%s-t-%s-n-%s-delta-%s-field-%s-amplitude-%s-ascale.npy' % (
-    nx, cycles, U, t, number, delta, field, F0, ascale)
-J_field = np.load('./data/original/Jfield' + parameternames)
-phi_original = np.load('./data/original/phi' + parameternames)
-phi_reconstruct = np.load('./data/original/phirecon' + parameternames)
-neighbour = np.load('./data/original/neighbour' + parameternames)
-# neighbour_check = np.load('./data/original/neighbour_check' + parameternames)
-# energy = np.load('./data/original/energy' + parameternames)
-# doublon_energy = np.load('./data/original/doublonenergy' + parameternames)
-# doublon_energy_L = np.load('./data/original/doublonenergy2' + parameternames)
-# singlon_energy = np.load('./data/original/singlonenergy' + parameternames)
+libN = 10
+cycles = libN + 1
+U_start = 0 * t
+U_end = 1 * t
+sections = (cycles - 1) / libN
+U_list = np.linspace(U_start, U_end, libN)
+threads = libN
+print("threads =%s" % threads)
+os.environ["OMP_NUM_THREADS"] = "%s" % threads
+# pool = Pool(processes=cpu_count())
 
 
-parameternames2 = '-%s-nsites-%s-cycles-%s-U-%s-t-%s-n-%s-delta-%s-field-%s-amplitude.npy' % (
-    nx2, cycles2, U2, t2, number2, delta2, field2, F0)
-newparameternames2 = '-%s-nsites-%s-cycles-%s-U-%s-t-%s-n-%s-delta-%s-field-%s-amplitude-%s-ascale.npy' % (
-    nx2, cycles2, U2, t2, number2, delta2, field2, F0, ascale2)
-J_field2 = np.load('./data/original/Jfield' + parameternames2)
-# two_body2 = np.load('./data/original/twobody' + parameternames2)
-neighbour2 = np.load('./data/original/neighbour' + parameternames2)
-phi_original2 = np.load('./data/original/phi' + parameternames2)
-# energy2 = np.load('./data/original/energy' + parameternames2)
-# doublon_energy2 = np.load('./data/original/doublonenergy' + parameternames2)
-# doublon_energy_L2 = np.load('./data/original/doublonenergy2' + parameternames2)
-# singlon_energy2 = np.load('./data/original/singlonenergy' + parameternames2)
-# error2 = np.load('./data/original/error' + parameternames2)
+parameternames = '-%s-nsites-%s-cycles-%s-t-%s-n-%s-delta-%s-field-%s-amplitude-%s-libN-%s-U_start-%s-U_end.npy' % (
+    nx, cycles, t, number, delta, field, F0, libN, U_start, U_end)
+phi_discrim = np.load('./data/original/discriminatorfield' + parameternames)
+times = np.linspace(0, cycles, len(phi_discrim))
 
-times = np.linspace(0, cycles, len(J_field))
-times2 = np.linspace(0, cycles2, len(J_field2))
-fig, (ax1, ax2) = plt.subplots(nrows=2, sharex=True)
-ax1.plot(times, J_field, label='$\\frac{U}{t_0}=0$')
-ax2.plot(times2, J_field2, label='$\\frac{U}{t_0}=7$')
-ax1.set_ylabel('$\\frac{{\\rm d}J}{{\\rm d}t}$')
-ax2.set_ylabel('$\\frac{{\\rm d}J}{{\\rm d}t}$')
-
-plt.xlabel('Time [cycles]')
+plt.plot(times, phi_discrim)
+plt.xlabel('Time (cycles)')
+plt.ylabel('$\\Phi(t)$')
+plt.title('Discriminating field for 9 species')
+plt.yticks(np.arange(-3 * np.pi, 3 * np.pi, 0.5 * np.pi),
+           [r"$" + format(r / np.pi, ".2g") + r"\pi$" for r in np.arange(-3 * np.pi, 3 * np.pi, .5 * np.pi)])
 plt.show()
 
-fig, (ax1, ax2) = plt.subplots(nrows=2, sharex=True)
-ax1.plot(times, phi_original, label='$\\frac{U}{t_0}=0$')
-ax2.plot(times2, phi_original2, label='$\\frac{U}{t_0}=7$')
-ax1.set_ylabel('$\\frac{{\\rm d}J}{{\\rm d}t}$')
-ax2.set_ylabel('$\\frac{{\\rm d}J}{{\\rm d}t}$')
 
-plt.xlabel('Time [cycles]')
-plt.show()
+def setup(U_input):
+    system = harmonic.hhg(cycles=cycles, delta=delta, libN=libN, field=field, nup=number, ndown=number, nx=nx, ny=0,
+                          U=U_input, t=t, F0=F0, a=a, bc='pbc', phi=phi_discrim)
+    return system
 
-plt.plot(times, phi_original)
-plt.plot(times2, phi_original2, linestyle='dashed')
-plt.show()
 
-plt.plot(times, J_field)
-plt.plot(times2, J_field2, linestyle='dashed')
+systems = []
+J_fields = []
+J_fields_alt = []
+for U in U_list:
+    systems.append(setup(U))
+
+phi_discrim = np.load('./data/original/discriminatorfield' + parameternames)
+times = np.linspace(0, cycles, len(phi_discrim))
+
+plt.subplot(211)
+plt.plot(times, phi_discrim)
+plt.ylabel('$\\Phi(t)$')
+plt.title('Discriminating field for 9 species')
+plt.yticks(np.arange(-3 * np.pi, 3 * np.pi, 0.5 * np.pi),
+           [r"$" + format(r / np.pi, ".2g") + r"\pi$" for r in np.arange(-3 * np.pi, 3 * np.pi, .5 * np.pi)])
+plt.subplot(212)
+for system in systems:
+    Jparameternames = '-%s-nsites-%s-cycles-%s-U-%s-t-%s-n-%s-delta-%s-field-%s-amplitude-%s-libN-%s-U_start-%s-U_end.npy' % (
+        nx, cycles, system.U, t, number, delta, field, F0, libN, U_start, U_end)
+    J_fields.append(np.load('./data/discriminate/Jfield' + Jparameternames))
+
+    plt.plot(times, J_fields[-1], label='$\\frac{U}{t_0}=$%.2f' % (system.U))
+plt.xlabel('(Time (cycles)')
+plt.ylabel('J(t)')
+plt.legend()
 plt.show()
 
 discrim_currents = []
-for k in [0.9, 1]:
-    U = k * t
-    parameternames = '-%s-nsites-%s-cycles-%s-U-%s-t-%s-n-%s-delta-%s-field-%s-amplitude.npy' % (
-        nx, cycles, U, t, number, delta, field, F0)
-    J_field_discrim = np.load('./data/discriminate/Jfield' + parameternames)
-    discrim_currents.append(J_field_discrim)
-    plt.plot(times, discrim_currents[-1])
-plt.show()
 
-s = np.random.rand(2)
+# s = np.array(np.random.rand(libN)+1)
+s = np.random.uniform(0.1, 1, libN)
 s = s / np.sum(s)
-
-print(s)
+J_mat = np.zeros((libN, libN))
+discrim_J_sum = np.zeros(libN)
 combined_current = 0
-for k in [0, 1]:
-    combined_current += s[k] * discrim_currents[k]
-plt.plot(times, combined_current)
-plt.show()
 
-cut = int(3 * len(discrim_currents[0]) / 4) + 10
 
-sig = np.sum(np.abs(discrim_currents[0][cut:-10]))
-print(sig)
+def all_points_error(J_fields):
+    """Using all time points"""
+    s = np.random.uniform(0.1, 1, libN)
+    s = s / np.sum(s)
+    combined_current = 0
+    for k in range(libN):
+        J_fields[k] = J_fields[k] ** 2
+        combined_current += s[k] * J_fields[k]
+    # inv_J=np.linalg.inv(J_mat)
+    inv_J = np.transpose(np.linalg.pinv(J_fields))
+    discrim_J_sum = np.array(combined_current)
+    recalculated = np.dot(inv_J, discrim_J_sum)
+    recalculated = np.dot(inv_J, discrim_J_sum)
+    errors = np.abs(s - recalculated) / s
+    error_mean = 100 * np.mean(errors)
+    error_std = np.std(errors)
+    return recalculated, s, error_mean, error_std
 
-combined_sum = np.sum(np.abs(combined_current[cut:-10]))
 
-concentration = combined_sum / sig
+def averaged_error(J_fields):
+    """averaging absolute values"""
+    s = np.random.uniform(0.1, 1, libN)
+    s = s / np.sum(s)
+    J_mat = np.zeros((libN, libN))
+    discrim_J_sum = np.zeros(libN)
+    combined_current = 0
+    for k in range(libN):
+        combined_current += s[k] * J_fields[k] ** 2
+    sec_length = int(len(phi_discrim) / cycles)
+    for j in range(libN):
+        for k in range(libN):
+            J_n = J_fields[j] ** 2
+            sec_start = (int(1.1 * (k + 1) * sec_length))
+            sec_end = int((k + 2) * sec_length)
+            if j == k:
+                discrim_J_sum[j] = np.sum(np.abs(combined_current[sec_start:sec_end]))
+            else:
+                sum_J = np.sum(J_n[sec_start:sec_end])
+                J_mat[k, j] = sum_J
+    # inv_J = np.linalg.inv(J_mat)
+    inv_J = np.linalg.pinv(J_mat)
+    # discrim_J_sum=np.array(combined_current)
+    recalculated = np.dot(inv_J, discrim_J_sum)
+    errors = 100 * np.abs(s - recalculated) / s
+    error_mean = np.mean(errors)
+    error_std = np.std(errors)
+    return recalculated, s, error_mean, error_std
 
-print('Actual concentration is %s, Optical Discrimination predicts a concentration of %s' % (s[0], concentration))
 
-plt.plot(times[:-5], combined_current[:-5], label='True Current')
-plt.plot(times[:-5], concentration * discrim_currents[0][:-5] + (1 - concentration) * discrim_currents[1][:-5],
-         linestyle='dashed', label='ODD reconstruction')
-plt.ylabel('$J(t)$')
-plt.xlabel('Time')
-plt.legend()
+def averaged_cond(J_fields, j):
+    """averaging absolute values"""
+    s = np.random.uniform(0.1, 1, j)
+    s = s / np.sum(s)
+    J_mat = np.zeros((j, j))
+    discrim_J_sum = np.zeros(j)
+    combined_current = 0
+    for k in range(j):
+        combined_current += s[k] * J_fields[k] ** 2
+    sec_length = int(len(phi_discrim) / cycles)
+    for l in range(j):
+        for k in range(j):
+            J_n = J_fields[l] ** 2
+            sec_start = (int(1.1 * (k + 1) * sec_length))
+            sec_end = int((k + 2) * sec_length)
+            if l == k:
+                discrim_J_sum[l] = np.sum(np.abs(combined_current[sec_start:sec_end]))
+            else:
+                sum_J = np.sum(J_n[sec_start:sec_end])
+                J_mat[k, l] = sum_J
+    # inv_J = np.linalg.inv(J_mat)
+    condition = np.linalg.cond(J_mat)
+
+    return condition
+
+
+def all_points_cond(J_fields, j):
+    """Using all time points"""
+    s = np.random.uniform(0.1, 1, j)
+    s = s / np.sum(s)
+    combined_current = 0
+    for k in range(j):
+        J_fields[k] = J_fields[k] ** 2
+        combined_current += s[k] * J_fields[k]
+    # inv_J=np.linalg.inv(J_mat)
+    condition = np.linalg.cond(J_fields)
+    return condition
+
+
+def blockPrint():
+    sys.stdout = open(os.devnull, 'w')
+
+
+# Restore
+def enablePrint():
+    sys.stdout = sys.__stdout__
+
+
+for k in range(len(s)):
+    # recalculated,s, error_mean, error_std=averaged_error(J_fields)
+    recalculated, s, error_mean, error_std = all_points_error(J_fields)
+    print('Actual concentration is %s, Optical Discrimination predicts a concentration of %s' % (s[k], recalculated[k]))
+
+print('mean error is %.2e %%' % (error_mean))
+print('error std is %.2e %%' % (error_std))
+numbers = []
+condition_av = []
+condition_all = []
+
+for m in range(5, 11):
+    print("calculating for %s species" % (m))
+    cycles = m + 1
+    U_list = np.linspace(U_start, U_end, m)
+    systems = []
+    J_fields = []
+
+    all_errors = []
+    for U in U_list:
+        blockPrint()
+        systems.append(setup(U))
+    for system in systems:
+        Jparameternames = '-%s-nsites-%s-cycles-%s-U-%s-t-%s-n-%s-delta-%s-field-%s-amplitude-%s-libN-%s-U_start-%s-U_end.npy' % (
+            nx, cycles, system.U, t, number, delta, field, F0, m, U_start, U_end)
+        J_fields.append(np.load('./data/discriminate/Jfield' + Jparameternames))
+        print(len(J_fields))
+    # recalculated,s, error_mean, error_std=averaged_error(J_fields)
+    # recalculated,s, error_mean, error_std=all_points_error(J_fields)
+    condition_av.append(averaged_cond(J_fields, m))
+    condition_all.append(all_points_cond(J_fields, m))
+    numbers.append(m)
+    # all_errors.append(error_mean)
+    enablePrint()
+    print(m)
+
+print(numbers)
+print(condition_av)
+print(condition_all)
+
+plt.plot(numbers, condition_all)
+plt.ylabel('Condition Number')
+plt.xlabel('Number of Species')
 plt.show()
