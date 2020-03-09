@@ -25,9 +25,9 @@ def get_U(system):
 
 def pump(system):
     def phi_pump(current_time):
-        frac = 1
-        if current_time < frac / (system.freq):
-            phi = (system.a * system.F0 / system.field) * np.sin(current_time * system.field / (frac))
+        frac = 0.5
+        if current_time < 1 / (system.freq):
+            phi = (system.a * system.F0 / system.field) * np.sin(current_time * system.field / (frac))*np.sin(0.5*current_time * system.field)**2
         else:
             phi = 0.
         return phi
@@ -41,6 +41,65 @@ def pump(system):
     r = ode(evolve.integrate_f_discrim).set_integrator('zvode', method='bdf')
     r.set_initial_value(psi_temp, 0).set_f_params(system, h, phi_pump)
     while r.successful() and r.t < 1 / system.freq:
+        oldpsi = psi_temp
+        r.integrate(r.t + system.delta)
+        psi_temp = r.y
+        newtime = r.t
+        # add to expectations
+
+        # double occupancy fails for anything other than half filling.
+        # D.append(evolve.DHP(prop,psi))
+        # harmonic.progress(N, int(newtime / delta))
+        phi_original.append(phi_pump(newtime))
+        neighbour = har_spec.nearest_neighbour_new(system, h, psi_temp)
+        J_field.append(har_spec.J_expectation_track(system, h, psi_temp, phi_original[-1]))
+        neighbours.append(neighbour)
+    system.last_psi = psi_temp
+    system.last_J = J_field
+    system.phi = phi_original
+    system.neighbourexpec = neighbours
+    return system
+
+import numpy as np
+from scipy.integrate import ode
+from scipy.interpolate import interp1d
+
+# from tqdm import tqdm
+import definition as harmonic
+# This contains the stuff needed to calculate some expectations. Generally contains stuff
+# that applies operators to the wave function
+import evolve as evolve
+# These also contain various important observable calculators
+import harmonic as har_spec
+# Contains lots of important functions.
+# import definition as definition
+# Sets up the lattice for the system
+import hub_lats as hub
+
+
+def get_U(system):
+    return system.U
+
+
+
+
+
+
+def long_pump(system):
+    def phi_pump(current_time):
+        frac = 1
+        phi = (system.a * system.F0 / system.field) * np.sin(current_time * system.field / (frac))*np.sin(0.5*current_time * system.field/system.cycles)**2
+        return phi
+
+    phi_original = []
+    J_field = []
+    neighbours = []
+    psi_temp = harmonic.hubbard(system)[1].astype(complex)
+    init = psi_temp
+    h = hub.create_1e_ham(system, True)
+    r = ode(evolve.integrate_f_discrim).set_integrator('zvode', method='bdf')
+    r.set_initial_value(psi_temp, 0).set_f_params(system, h, phi_pump)
+    while r.successful() and r.t < system.cycles / system.freq:
         oldpsi = psi_temp
         r.integrate(r.t + system.delta)
         psi_temp = r.y

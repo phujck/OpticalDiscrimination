@@ -58,7 +58,7 @@ if __name__ == '__main__':
     a = 4
 
     U_start = 1 * t
-    U_end = 1.00006* t
+    U_end = 1.5 * t
     sections = (cycles - 1) / libN
     U_list = np.linspace(U_start, U_end, libN)
 
@@ -107,183 +107,13 @@ if __name__ == '__main__':
     parallel_start = time.time()
 
     """Adaptive timestep method"""
-    systems = pool.map(poolscripts.pump, systems)
+    systems = pool.map(poolscripts.long_pump, systems)
     print("pump done")
-
-    #
-    # print("normalisation")
-    # print(np.dot(x[1][0],np.conj(x[1][0])))
-    # print(np.dot(x[0][0],np.conj(x[0][0])))
-    # print("currents")
-    # print(x[0][1])
-    # print(x[1][1])
-    print(systems[0].last_J)
-    print(systems[0].last_psi)
-
-    """Now we track one of the systems, evolve it, then evolve the rest with the phi we obtain."""
-
-
-    def evolve_track(system, k):
-        phi_original = system.phi.copy()
-        inittime = 1 / system.freq + k * sections / system.freq
-        J_field = system.last_J.copy()
-        last_current = J_field[-1]
-        neighbours = system.neighbourexpec.copy()
-        psi_temp = system.last_psi.copy()
-
-        def J_func(current_time):
-            J = last_current * np.exp(-5 * (current_time - inittime))
-            return J
-
-        h = hub.create_1e_ham(system, True)
-        r = ode(evolve.integrate_f_track_J).set_integrator('zvode', method='bdf')
-        r.set_initial_value(psi_temp, inittime).set_f_params(system, h, J_func)
-        branch = 0
-        delta = system.delta
-        while r.successful() and r.t < 1 / system.freq + (k + 1) * sections / system.freq:
-            r.integrate(r.t + system.delta)
-            psi_temp = r.y
-            newtime = r.t
-            # add to expectations
-            neighbour = har_spec.nearest_neighbour_new(system, h, psi_temp)
-            # two_body.append(har_spec.two_body_old(system, psi_temp))
-            # tracking current
-            newphi = evolve.phi_J_track(system, newtime, J_func, neighbour, psi_temp)
-            if newphi - phi_original[-1] > 1.5 * np.pi:
-                newphi = newphi - 2 * np.pi
-            elif newphi - phi_original[-1] < -1.5 * np.pi:
-                newphi = newphi + 2 * np.pi
-            phi_original.append(newphi)
-            J_field.append(har_spec.J_expectation_track(system, h, psi_temp, phi_original[-1]))
-            harmonic.progress(N, int(newtime / delta))
-            neighbours.append(neighbour)
-            system.last_psi = psi_temp
-            system.phi = phi_original
-            system.last_J = J_field
-            system.neighbourexpec = neighbours
-        return system
-
-
-    J_fields = []
-    print(len(systems))
-    k = 0
-    # for k in range(0, libN):
-    #     print('now on iteration k=%s' % k)
-    #     systems[0] = evolve_track(systems[0], k)
-    #     J_fields.append(systems[0].last_J)
-    #     print('tracking evolve done')
-    #     if len(systems) > 1:
-    #         for j in range(len(systems)):
-    #             systems[j].phi = systems[0].phi
-    #         evolve_start = time.time()
-    #         systems = pool.map(poolscripts.evolve_others, systems[1:])
-    #         evolve_end = time.time()
-    #         print("time for evolving with tracked phi: %s seconds." % (evolve_end - evolve_start))
-    #     print('number of systems= %s' % len(systems))
-
-    for k in range(0, libN):
-        print('number of systems= %s' % len(systems))
-        print('now on iteration k=%s' % k)
-        systems[k] = evolve_track(systems[k], k)
-        print('tracking evolve done')
-        for j in range(len(systems)):
-            systems[j].phi = systems[k].phi.copy()
-            systems[j].iter = k
-        evolved_system = systems.pop(k)
-        evolve_start = time.time()
-        systems = pool.map(poolscripts.evolve_others, systems)
-        systems.insert(k, evolved_system)
-        evolve_end = time.time()
-        print("time for evolving with tracked phi: %s seconds." % (evolve_end - evolve_start))
-    parallel_end = time.time()
-
-    plt.plot(systems[0].phi)
-    plt.show()
-    for system in systems:
-        plt.plot(system.phi)
-    plt.show()
-    # parallel_end = time.time()
-    # phi_original=systems[0].phi
-    # print("parallel done!")
-    # print(N)
-    # print(len(phi_original))
-
-    """Evolve with RK4"""
-    # systems = pool.map(poolscripts.pump_RK4, systems)
-    # print("pump done")
-    #
-    # #
-    # # print("normalisation")
-    # # print(np.dot(x[1][0],np.conj(x[1][0])))
-    # # print(np.dot(x[0][0],np.conj(x[0][0])))
-    # # print("currents")
-    # # print(x[0][1])
-    # # print(x[1][1])
-    # print(systems[0].last_J)
-    # print(systems[0].last_psi)
-    #
-    # """Now we track one of the systems, evolve it, then evolve the rest with the phi we obtain."""
-    #
-    #
-    # def evolve_track_RK4(system, k):
-    #     delta=system.delta
-    #     phi_original = system.phi.copy()[:-1]
-    #     init_step = int((k+1) / (system.freq*system.delta))
-    #     end_step=init_step+int(1/(system.freq*system.delta))
-    #     J_field=system.last_J.copy()
-    #     last_current=J_field[-1]
-    #     J_field=J_field[:-1]
-    #     psi_temp=system.last_psi
-    #     def J_func(current_time):
-    #         # J = last_current * np.exp(-2 * (current_time - system.delta*init_step))
-    #         # return J
-    #         return 0
-    #
-    #
-    #     h = hub.create_1e_ham(system, True)
-    #
-    #     for j in range(init_step,end_step):
-    #         newtime = j*system.delta
-    #         neighbour=har_spec.nearest_neighbour_new(system, h, psi_temp)
-    #         newphi = evolve.phi_J_track(system, newtime, J_func, neighbour, psi_temp)
-    #         phi_original.append(newphi)
-    #         J_field.append(har_spec.J_expectation_track(system, h, psi_temp, phi_original[-1]))
-    #         psi_temp = evolve.RK4_J_track(system, h, delta, newtime,J_func, neighbour, psi_temp)
-    #         # add to expectations
-    #         harmonic.progress(N, int(newtime / delta))
-    #     newtime = end_step * system.delta
-    #     neighbour = har_spec.nearest_neighbour_new(system, h, psi_temp)
-    #     newphi = evolve.phi_J_track(system, newtime, J_func, neighbour, psi_temp)
-    #     phi_original.append(newphi)
-    #     J_field.append(har_spec.J_expectation_track(system, h, psi_temp, phi_original[-1]))
-    #     system.last_psi=psi_temp
-    #     system.phi=phi_original
-    #     system.last_J=J_field
-    #     return system
-    #
-    # J_fields=[]
-    # print(len(systems))
-    # k = 0
-    #
-    # for k in range(0, libN):
-    #     print('now on iteration k=%s' % k)
-    #     systems[k] = evolve_track_RK4(systems[k], k)
-    #     print('tracking evolve done')
-    #     for j in range(len(systems)):
-    #         systems[j].iter=k
-    #         systems[j].phi = systems[k].phi
-    #     evolved_system=systems.pop(k)
-    #     evolve_start = time.time()
-    #     systems = pool.map(poolscripts.evolve_others_RK4, systems)
-    #     systems.insert(k,evolved_system)
-    #     evolve_end = time.time()
-    #     print("time for evolving with tracked phi: %s seconds." % (evolve_end - evolve_start))
-    #     print('number of systems= %s' % len(systems))
-    # parallel_end = time.time()
-    #
 
     parallel_end = time.time()
     phi_original = systems[0].phi
+    plt.plot(phi_original)
+    plt.show()
     for k in range(0, libN):
         plt.plot(systems[k].last_J, '*-')
     plt.show()
@@ -300,13 +130,13 @@ if __name__ == '__main__':
     for system in systems:
         parameternames = '-%s-nsites-%s-cycles-%s-U-%s-t-%s-n-%s-delta-%s-field-%s-amplitude-%s-libN-%s-U_start-%s-U_end' % (
             nx, cycles, system.U, t, number, delta, field, F0, libN, U_start, U_end)
-        np.save('./data/discriminate/Jfield' + parameternames, system.last_J)
+        np.save('./data/discriminate/Jfieldpump' + parameternames, system.last_J)
 
     print("Time for using multiprocessing pool: %s seconds" % (parallel_end - parallel_start))
 
     parameternames = '-%s-nsites-%s-cycles-%s-t-%s-n-%s-delta-%s-field-%s-amplitude-%s-libN-%s-U_start-%s-U_end' % (
         nx, cycles, t, number, delta, field, F0, libN, U_start, U_end)
-    np.save('./data/original/discriminatorfield' + parameternames, phi_original)
+    np.save('./data/original/pumpfield' + parameternames, phi_original)
 
     #     prop=systems[k]
     #     r = ode(evolve.integrate_f_discrim).set_integrator('zvode', method='bdf')

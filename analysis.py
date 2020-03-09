@@ -174,10 +174,10 @@ def all_points_error(J_fields):
     discrim_J_sum = np.array(combined_current)
     recalculated = np.dot(inv_J, discrim_J_sum)
     recalculated = np.dot(inv_J, discrim_J_sum)
-    errors = np.abs(s - recalculated) / s
-    error_mean = 100 * np.mean(errors)
-    error_std = np.std(errors)
-    return recalculated, s, error_mean, error_std
+    errors = np.linalg.norm((s - recalculated))/np.linalg.norm(s)
+    # error_mean = 100 * np.mean(errors)
+    # error_std = np.std(errors)
+    return recalculated,errors
 
 
 def averaged_error(J_fields):
@@ -260,19 +260,58 @@ def enablePrint():
 
 for k in range(len(s)):
     # recalculated,s, error_mean, error_std=averaged_error(J_fields)
-    recalculated, s, error_mean, error_std = all_points_error(J_fields)
+    recalculated,  error_mean= all_points_error(J_fields)
     print('Actual concentration is %s, Optical Discrimination predicts a concentration of %s' % (s[k], recalculated[k]))
 
 print('mean error is %.2e %%' % (error_mean))
-print('error std is %.2e %%' % (error_std))
+# print('error std is %.2e %%' % (error_std))
 numbers = []
 condition_av = []
 condition_all = []
+error_list=[]
 
-for m in range(5, 11):
-    print("calculating for %s species" % (m))
-    cycles = m + 1
-    U_list = np.linspace(U_start, U_end, m)
+# for m in range(5, 11):
+#     print("calculating for %s species" % (m))
+#     cycles = m + 1
+#     U_list = np.linspace(U_start, U_end, m)
+#     systems = []
+#     J_fields = []
+#
+#     all_errors = []
+#     for U in U_list:
+#         blockPrint()
+#         systems.append(setup(U))
+#     for system in systems:
+#         Jparameternames = '-%s-nsites-%s-cycles-%s-U-%s-t-%s-n-%s-delta-%s-field-%s-amplitude-%s-libN-%s-U_start-%s-U_end.npy' % (
+#             nx, cycles, system.U, t, number, delta, field, F0, m, U_start, U_end)
+#         J_fields.append(np.load('./data/discriminate/Jfield' + Jparameternames))
+#         print(len(J_fields))
+#     # recalculated,s, error_mean, error_std=averaged_error(J_fields)
+#     # recalculated,s, error_mean, error_std=all_points_error(J_fields)
+#     condition_av.append(averaged_cond(J_fields, m))
+#     condition_all.append(all_points_cond(J_fields, m))
+#     numbers.append(m)
+#     # all_errors.append(error_mean)
+#     enablePrint()
+#     print(m)
+#
+# print(numbers)
+# print(condition_av)
+# print(condition_all)
+#
+# plt.plot(numbers, condition_all)
+# plt.ylabel('Condition Number')
+# plt.xlabel('Number of Species')
+# plt.show()
+
+
+U_start=1*t
+for U_end in [2,1.5,1.1,1.05,1.01,1.005,1.001,1.0005]:
+    U_end=U_end*t
+    print("calculating for delta %.2e " % (U_start-U_end))
+    libN=2
+    cycles = 3
+    U_list = np.linspace(U_start, U_end, 2)
     systems = []
     J_fields = []
 
@@ -282,23 +321,24 @@ for m in range(5, 11):
         systems.append(setup(U))
     for system in systems:
         Jparameternames = '-%s-nsites-%s-cycles-%s-U-%s-t-%s-n-%s-delta-%s-field-%s-amplitude-%s-libN-%s-U_start-%s-U_end.npy' % (
-            nx, cycles, system.U, t, number, delta, field, F0, m, U_start, U_end)
+            nx, cycles, system.U, t, number, delta, field, F0, 2, U_start, U_end)
         J_fields.append(np.load('./data/discriminate/Jfield' + Jparameternames))
         print(len(J_fields))
     # recalculated,s, error_mean, error_std=averaged_error(J_fields)
-    # recalculated,s, error_mean, error_std=all_points_error(J_fields)
-    condition_av.append(averaged_cond(J_fields, m))
-    condition_all.append(all_points_cond(J_fields, m))
-    numbers.append(m)
+    recalculated,errors=all_points_error(J_fields)
+    error_list.append(errors)
+    condition_av.append(averaged_cond(J_fields, 2))
+    condition_all.append(all_points_cond(J_fields, 2))
+    numbers.append(U_end-U_start)
     # all_errors.append(error_mean)
     enablePrint()
-    print(m)
 
-print(numbers)
-print(condition_av)
 print(condition_all)
-
-plt.plot(numbers, condition_all)
+print(numbers)
+plt.semilogx(numbers, condition_all)
 plt.ylabel('Condition Number')
 plt.xlabel('Number of Species')
+plt.show()
+
+plt.semilogx(numbers,error_list)
 plt.show()
