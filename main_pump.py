@@ -10,17 +10,13 @@ from multiprocessing import get_context
 
 import matplotlib.pyplot as plt
 import numpy as np
-from scipy.integrate import ode
 
 import definition as harmonic
 # This contains the stuff needed to calculate some expectations. Generally contains stuff
 # that applies operators to the wave function
-import evolve as evolve
 # These also contain various important observable calculators
-import harmonic as har_spec
 # Contains lots of important functions.
 # Sets up the lattice for the system
-import hub_lats as hub
 import poolscripts
 
 # input units: THz (field), eV (t, U), MV/cm (peak amplitude, F0), Angstroms (systems[0]tice cst, a)
@@ -57,8 +53,9 @@ if __name__ == '__main__':
     F0 = 10
     a = 4
 
+    U_delta = -15
     U_start = 1 * t
-    U_end = 1.5 * t
+    U_end = U_start + (10 ** U_delta) * t
     sections = (cycles - 1) / libN
     U_list = np.linspace(U_start, U_end, libN)
 

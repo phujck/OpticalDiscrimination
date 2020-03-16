@@ -1,18 +1,10 @@
-import numpy as np
-from scipy.integrate import ode
-from scipy.interpolate import interp1d
-
 # from tqdm import tqdm
-import definition as harmonic
 # This contains the stuff needed to calculate some expectations. Generally contains stuff
 # that applies operators to the wave function
-import evolve as evolve
 # These also contain various important observable calculators
-import harmonic as har_spec
 # Contains lots of important functions.
 # import definition as definition
 # Sets up the lattice for the system
-import hub_lats as hub
 
 
 def get_U(system):
@@ -27,7 +19,8 @@ def pump(system):
     def phi_pump(current_time):
         frac = 0.5
         if current_time < 1 / (system.freq):
-            phi = (system.a * system.F0 / system.field) * np.sin(current_time * system.field / (frac))*np.sin(0.5*current_time * system.field)**2
+            phi = (system.a * system.F0 / system.field) * np.sin(current_time * system.field / (frac)) * np.sin(
+                0.33 * current_time * system.field) ** 2
         else:
             phi = 0.
         return phi

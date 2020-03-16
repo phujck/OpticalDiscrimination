@@ -50,17 +50,18 @@ if __name__ == '__main__':
     # t=1.91
     # t=1
     U = 1 * t
-    delta = 0.02
+    delta = 0.0002
     cycles = libN + 1
     field = 32.9
     # field=32.9*2
     F0 = 10
     a = 4
-
+    U_delta = -15
     U_start = 1 * t
-    U_end = 1.00006* t
+    U_end = U_start + (10 ** U_delta) * t
     sections = (cycles - 1) / libN
-    U_list = np.linspace(U_start, U_end, libN)
+    # U_list = np.linspace(U_start, U_end, libN)
+    U_list = [1 * t, 1 * t]
 
 
     #
