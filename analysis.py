@@ -51,13 +51,15 @@ def FT(A):
 # delta = 2
 # cycles = 10
 params = {
-    'axes.labelsize': 30,
+    'axes.labelsize': 60,
     # 'legend.fontsize': 28,
     'legend.fontsize': 23,
     'xtick.labelsize': 22,
     'ytick.labelsize': 22,
     'figure.figsize': [2 * 3.375, 2 * 3.375],
-    'text.usetex': True
+    'text.usetex': True,
+    'lines.linewidth' : 3,
+    'lines.markersize' : 15
 }
 
 plt.rcParams.update(params)
@@ -153,48 +155,73 @@ plt.ylabel('J(t)')
 plt.legend()
 plt.show()
 
-# plt.plot(phi_discrim)
-# # plt.plot(phi_pumped)
+plt.plot(phi_discrim)
+np.save('discriminating_phi',phi_discrim)
+np.save('pump_phi',phi_pumped)
+
+plt.plot(phi_pumped)
+plt.axis('off')
+plt.show()
+J_comb=np.zeros(len(J_fields_pumped[0]))
+s = np.random.uniform(0.1, 1, libN)
+for j in range(0,3):
+    np.save('TL_J_field %s' %j,J_fields_pumped[j])
+    plt.plot(J_fields_pumped[j],color='red')
+    J_comb+= s[j]*J_fields_pumped[j]
+    plt.axis('off')
+    plt.show()
+np.save('TL_combined_J',J_comb)
+
+J_comb=np.zeros(len(J_fields[0]))
+s = np.random.uniform(0.1, 1, libN)
+for j in range(0,3):
+    np.save('discrim_J_field %s' %j,J_fields[j])
+    plt.plot(J_fields[j],color='red')
+    J_comb+= s[j]*J_fields[j]
+    plt.axis('off')
+    plt.show()
+np.save('TL_combined_J',J_comb)
+
+
+plt.plot(J_comb,color='red')
 # plt.axis('off')
 # plt.show()
-# J_comb=np.zeros(len(J_fields[0]))
-# s = np.random.uniform(0.1, 1, libN)
-# for j in range(0,3):
-#     plt.plot(J_fields[j],color='red')
-#     J_comb+= s[j]*J_fields[j]
-#     plt.axis('off')
-#     plt.show()
-#
-# plt.plot(J_comb,color='red')
-# plt.axis('off')
-# plt.show()
-# fig,axs=plt.subplots(4)
+fig,axs=plt.subplots(4)
 # length=int(1*len(times)/4)
-# xc=1
-# axs[0].plot(times[:length],phi_discrim[:length])
-# axs[0].axvline(x=xc, color='black', linestyle='dashed')
-# axs[0].text(0.5, 4, 'Pump Pulse', fontsize=25,ha='center')
-#
-# # axs[0].axvline(x=xc+1, color='black', linestyle='dashed')
-# # axs[0].text(1.5, 4, '$J_0=0$', fontsize=25,ha='center')
-#
-# # axs[0].axvline(x=xc+2, color='black', linestyle='dashed')
-# # axs[0].text(2.5, 4, '$J_1=0$', fontsize=25,ha='center')
-#
-# # axs[0].text(3.5, 4, '$J_2=0$', fontsize=25,ha='center')
-#
-#
-# axs[0].set( ylabel='$\\Phi(t)$',xlim=[0,cycles])
-# for j in range(0,3):
-#     axs[j+1].axvline(x=xc, color='black', linestyle='dashed')
-#     # axs[j+1].axvline(x=xc+1, color='black', linestyle='dashed')
-#     # axs[j+1].axvline(x=xc+2, color='black', linestyle='dashed')
-#     axs[j+1].plot(times[:length],J_fields[j][:length],color='red')
-#     axs[j+1].set(ylabel='$J_{%s}$' % j,xlim=[0,cycles])
-#
-# plt.xlabel('(Time (cycles)')
-#
-# plt.show()
+length=int(1*len(times))
+
+xc=1
+axs[0].plot(times[:length],phi_discrim[:length])
+axs[0].axvline(x=xc, color='black', linestyle='dashed')
+axs[0].text(0.5, 4, 'Pump Pulse', fontsize=40,ha='center')
+
+axs[0].axvline(x=xc+1, color='black', linestyle='dashed')
+axs[0].text(1.5, 4, '$R^{(0)}(t)=0$', fontsize=50,ha='center')
+
+axs[0].axvline(x=xc+2, color='black', linestyle='dashed')
+axs[0].text(2.5, 4, '$R^{(1)}(t)=0$', fontsize=50,ha='center')
+
+axs[0].text(3.5, 4, '$R^{(2)}(t)=0$', fontsize=50,ha='center')
+
+
+axs[0].set( ylabel='$E(t)$',xlim=[0,cycles])
+axs[3].yaxis.set_ticklabels([])
+# axs[3].xaxis.set_ticklabels([1,2,3,4])
+axs[3].xaxis.set_ticklabels(['','','T','','2T','','3T','','4T'],fontsize=40)
+
+for j in range(0,3):
+    axs[j].xaxis.set_ticklabels([])
+    axs[j].yaxis.set_ticklabels([])
+    axs[j + 1].plot(times[:length], J_fields[j][:length], color='red')
+    axs[j + 1].set(ylabel='$R^{(%s)}(t)$' % j, xlim=[0, cycles])
+    axs[j+1].axvline(x=xc, color='black', linestyle='dashed')
+    axs[j+1].axvline(x=xc+1, color='black', linestyle='dashed')
+    axs[j+1].axvline(x=xc+2, color='black', linestyle='dashed')
+
+
+plt.xlabel('Time')
+# plt.tight_layout()
+plt.show()
 discrim_currents = []
 
 # s = np.array(np.random.rand(libN)+1)
